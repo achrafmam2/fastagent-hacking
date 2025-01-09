@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "fastagent-hacking"
+  site-url: "https://achrafmam2.github.io/fastagent-hacking"
+  description: "Prototype for the Fast Agent library"
+  repo-branch: main
+  repo-url: "https://github.com/achrafmam2/fastagent-hacking"
