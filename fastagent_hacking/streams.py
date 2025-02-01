@@ -4,14 +4,22 @@
 
 # %% auto 0
 __all__ = ['StreamStatus', 'Stream', 'StreamWriter', 'InMemStreamWriter', 'tolist', 'of', 'concat', 'interleave', 'flatten',
-           'streamify', 'map']
+           'streamify', 'map', 'filter']
 
 # %% ../nbs/00_streams.ipynb 3
 import asyncio
 import functools
 import abc
 import enum
-from typing import AsyncIterable, AsyncIterator, Iterable, TypeVar, Generic
+from typing import (
+    AsyncIterable,
+    AsyncIterator,
+    Iterable,
+    TypeVar,
+    Generic,
+    Awaitable,
+    Callable,
+)
 
 # %% ../nbs/00_streams.ipynb 7
 _T = TypeVar("T")
@@ -259,3 +267,40 @@ def map(func, *streams) -> Stream[_T]:
             return result
 
     return _MappedStream()
+
+# %% ../nbs/00_streams.ipynb 53
+def filter(
+    predicate: Callable[[_T], bool | Awaitable[bool]],
+    stream: Stream[_T],
+) -> Stream[_T]:
+    """Filters the given stream using the given predicate.
+
+    Args:
+      predicate: A function or a coroutine that returns a boolean value.
+        If True, the element is included in the output.
+      streams: The streams to filter.
+    """
+
+    class _FilterdStream(Stream[_T]):
+
+        async def next(
+            self,
+            with_status: bool = False,
+        ) -> _T | None:
+            e, status = await stream.next(with_status=True)
+            if status != StreamStatus.OK:
+                return None, status
+
+            if asyncio.iscoroutinefunction(predicate):
+                ok = await predicate(e)
+            else:
+                ok = predicate(e)
+
+            if not ok:
+                return await self.next(with_status=with_status)
+
+            if with_status:
+                return e, StreamStatus.OK
+            return e
+
+    return _FilterdStream()
