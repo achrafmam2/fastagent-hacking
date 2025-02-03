@@ -22,7 +22,7 @@ _T = TypeVar("T")
 
 
 class PacketType(enum.StrEnum):
-    MAIN = enum.auto()
+    DATA = enum.auto()
     LOG_PACKET = enum.auto()
     EVENT_PACKET = enum.auto()
     CANCELLATION_PACKET = enum.auto()

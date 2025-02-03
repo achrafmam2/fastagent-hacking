@@ -214,10 +214,27 @@ def flatten(s: Stream[_T | Stream[_T]]) -> Stream[_T]:
     return of(consume(s))
 
 # %% ../nbs/00_streams.ipynb 38
-def streamify(func) -> Stream[_T]:
+def streamify(
+    func: Callable,
+    *,
+    return_shutdown_fn: bool = False,
+) -> Callable:
+    """Decorator to convert the output of a function to a stream.
+
+    Handles both (a)sync functions, as well as (a)sync generators.
+
+    Args:
+      func: The function to be decorated.
+      return_shutdown_fn: If True, calling the decorated function returns a tuple
+        containing the stream and a function to close the stream generation. The
+        shutdown function will try to cancel the decorated function if it's still running.
+    """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Stream[_T]:
+    def wrapper(
+        *args,
+        **kwargs,
+    ) -> Stream[_T] | tuple[Stream[_T] | Callable[[], None]]:
         sw = InMemStreamWriter()
 
         async def mk_stream():
@@ -235,12 +252,16 @@ def streamify(func) -> Stream[_T]:
 
         # Write to the stream in the background.
         # FIXME: Handle errors otherwise they are silently ignored.
-        asyncio.create_task(mk_stream())
+        t = asyncio.create_task(mk_stream())
+        if return_shutdown_fn:
+            # FIXME: Not sure but I think if the function is sync, the cancellation will not be immediate.
+            #    If it's the case we may want to at least shutdown the stream soon.
+            return sw.readonly(), t.cancel
         return sw.readonly()
 
     return wrapper
 
-# %% ../nbs/00_streams.ipynb 46
+# %% ../nbs/00_streams.ipynb 47
 def map(func, *streams) -> Stream[_T]:
     """Maps the given function over the given streams."""
 
@@ -268,7 +289,7 @@ def map(func, *streams) -> Stream[_T]:
 
     return _MappedStream()
 
-# %% ../nbs/00_streams.ipynb 53
+# %% ../nbs/00_streams.ipynb 54
 def filter(
     predicate: Callable[[_T], bool | Awaitable[bool]],
     stream: Stream[_T],
