@@ -104,14 +104,11 @@ class InMemStreamWriter(StreamWriter[_T]):
 
         return _S()
 
-# %% ../nbs/00_streams.ipynb 16
+# %% ../nbs/00_streams.ipynb 17
 async def tolist(s: Stream[_T]) -> list[_T]:
-    xs = []
-    async for x in s:
-        xs.append(x)
-    return xs
+    return [e async for e in s]
 
-# %% ../nbs/00_streams.ipynb 18
+# %% ../nbs/00_streams.ipynb 19
 def of(*args: _T | AsyncIterable[_T] | Iterable[_T]) -> Stream[_T]:
     """Returns a Stream from the given source(s)."""
 
@@ -148,7 +145,7 @@ def of(*args: _T | AsyncIterable[_T] | Iterable[_T]) -> Stream[_T]:
 
     return _FromIterableStream(args)
 
-# %% ../nbs/00_streams.ipynb 24
+# %% ../nbs/00_streams.ipynb 25
 def concat(*streams: Stream[_T]) -> Stream[_T]:
     """Concatenates the given streams."""
 
@@ -179,7 +176,7 @@ def concat(*streams: Stream[_T]) -> Stream[_T]:
 
     return _ConcatStream()
 
-# %% ../nbs/00_streams.ipynb 29
+# %% ../nbs/00_streams.ipynb 30
 def interleave(*streams: Stream[_T]) -> Stream[_T]:
     w = InMemStreamWriter()
 
@@ -199,7 +196,7 @@ def interleave(*streams: Stream[_T]) -> Stream[_T]:
 
     return w.readonly()
 
-# %% ../nbs/00_streams.ipynb 33
+# %% ../nbs/00_streams.ipynb 34
 def flatten(s: Stream[_T | Stream[_T]]) -> Stream[_T]:
     """Flattens one level nested stream."""
 
@@ -213,7 +210,7 @@ def flatten(s: Stream[_T | Stream[_T]]) -> Stream[_T]:
 
     return of(consume(s))
 
-# %% ../nbs/00_streams.ipynb 38
+# %% ../nbs/00_streams.ipynb 39
 def streamify(
     func: Callable,
     *,
@@ -261,7 +258,7 @@ def streamify(
 
     return wrapper
 
-# %% ../nbs/00_streams.ipynb 47
+# %% ../nbs/00_streams.ipynb 48
 def map(func, *streams) -> Stream[_T]:
     """Maps the given function over the given streams."""
 
@@ -289,7 +286,7 @@ def map(func, *streams) -> Stream[_T]:
 
     return _MappedStream()
 
-# %% ../nbs/00_streams.ipynb 54
+# %% ../nbs/00_streams.ipynb 55
 def filter(
     predicate: Callable[[_T], bool | Awaitable[bool]],
     stream: Stream[_T],

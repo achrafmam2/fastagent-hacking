@@ -23,13 +23,19 @@ from . import channels as cx
 from . import streams as sx
 
 # %% ../nbs/03_llms.ipynb 8
+# The basic unit of a message is either a string, image or raw bytes.
 _MsgLeafContent = str | Image.Image | bytes
+
+# A message can be a single leaf content or a sequence of leaf contents.
 MsgContent = _MsgLeafContent | Sequence[_MsgLeafContent]
+
+# %% ../nbs/03_llms.ipynb 9
+# Utils for encoding/decoding messages.
 
 _TYPE_KEY = "__type__"
 
 
-def _encode_content(content: MsgContent) -> Any:
+def _encode(content: MsgContent) -> Any:
     if isinstance(content, Image.Image):
         buff = io.BytesIO()
         content.save(buff, format="PNG")
@@ -40,14 +46,14 @@ def _encode_content(content: MsgContent) -> Any:
     elif isinstance(content, bytes):
         return {"__type__": "bytes", "data": base64.b64encode(content).decode()}
     elif isinstance(content, (list, tuple)):
-        return [_encode_content(item) for item in content]
+        return [_encode(item) for item in content]
     elif isinstance(content, str):
         return content
 
     raise ValueError(f"Cannot serialize {content} with type {type(content)}")
 
 
-def _decode_content(content: Any) -> MsgContent:
+def _decode(content: Any) -> MsgContent:
     if isinstance(content, dict) and _TYPE_KEY in content:
         if content[_TYPE_KEY] == "PIL.Image":
             bs = base64.b64decode(content["data"])
@@ -55,13 +61,13 @@ def _decode_content(content: Any) -> MsgContent:
         elif content[_TYPE_KEY] == "bytes":
             return base64.b64decode(content["data"])
     elif isinstance(content, list):
-        return [_decode_content(item) for item in content]
+        return [_decode(item) for item in content]
     elif isinstance(content, str):
         return content
 
     raise ValueError(f"Cannot deserialize {content} with type {type(content)}")
 
-
+# %% ../nbs/03_llms.ipynb 10
 @dataclass_json
 @dataclass(frozen=True)
 class Msg:
@@ -79,30 +85,30 @@ class Msg:
     role: str
     content: MsgContent = field(
         metadata=config(
-            encoder=_encode_content,
-            decoder=_decode_content,
+            encoder=_encode,
+            decoder=_decode,
         )
     )
     name: str = ""
 
-# %% ../nbs/03_llms.ipynb 9
+# %% ../nbs/03_llms.ipynb 11
 @dataclass_json
 @dataclass(frozen=True)
 class MsgChunk:
     role: str
     content: MsgContent = field(
         metadata=config(
-            encoder=_encode_content,
-            decoder=_decode_content,
+            encoder=_encode,
+            decoder=_decode,
         )
     )
     end: bool
     name: str = ""
 
-# %% ../nbs/03_llms.ipynb 13
+# %% ../nbs/03_llms.ipynb 15
 MsgLike = Msg | MsgContent
 
-# %% ../nbs/03_llms.ipynb 14
+# %% ../nbs/03_llms.ipynb 16
 class Backend(abc.ABC):
 
     @abc.abstractmethod
@@ -131,7 +137,7 @@ class Backend(abc.ABC):
 
     # TODO: Add emebd method.
 
-# %% ../nbs/03_llms.ipynb 16
+# %% ../nbs/03_llms.ipynb 18
 class OpenaiAPI(Backend):
 
     def __init__(self, *, model: str, api_key: str | None = None):
@@ -192,7 +198,7 @@ class OpenaiAPI(Backend):
 
         return msglm.mk_msg(chunks, role=role, api="openai")
 
-# %% ../nbs/03_llms.ipynb 26
+# %% ../nbs/03_llms.ipynb 28
 class Chat(tx.Transform[MsgLike, MsgChunk]):
 
     def __init__(
@@ -201,6 +207,8 @@ class Chat(tx.Transform[MsgLike, MsgChunk]):
         history: Sequence[MsgLike] = [],  # TODO: Add possibility to load from DB.
         name: str = "",
     ):
+        # TODO: Add configuration for the temperature.
+        # TODO: Add possibility to send full Msg not just chunks.
         self._backend = backend
         self._history = list(history)
         self._name = name
@@ -221,7 +229,8 @@ class Chat(tx.Transform[MsgLike, MsgChunk]):
             resp = self._merge_content(new=chunk.content, prev=resp)
             yield chunk
 
-        # Only record the history if the chat completion completes. Cshats can be interrupted.
+        # Only record the history if the chat completion ends because
+        # chats can be interrupted mid turns.
         self._history.extend(
             (
                 msg,

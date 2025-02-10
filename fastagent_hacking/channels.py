@@ -50,7 +50,7 @@ class Packet(Generic[_T]):
         It's up to the packet creator to decide whether to copy the tags or not.
     """
 
-    payload: _T
+    payload: _T  # FIXME: This type should be serializeable.
     packet_type: PacketType
     packet_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     parent_packet_id: str | None = None
