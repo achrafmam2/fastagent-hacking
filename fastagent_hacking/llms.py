@@ -214,7 +214,7 @@ class Chat(tx.Transform[MsgLike, MsgChunk]):
         self._name = name
 
     def __call__(self, chan: cx.Channel[MsgLike]) -> cx.Channel[MsgChunk]:
-        p = tx.Latch() | self.chat
+        p = tx.CancelPrev() | self.chat
         return p(chan)
 
     async def chat(self, msg: MsgLike):
